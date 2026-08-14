@@ -35,7 +35,15 @@ ldid 签名的 CLI 二进制在 Dopamine 上**实测拿不到可执行页**（`K
 定义该宏会让 V8 走 `V8_OS_IOS` 内存路径（同样的 MAP_JIT 问题 + 更多 iOS 专属分支）。
 不定义 → `V8_OS_MACOS` + `V8_TARGET_OS_IOS`（后者由 gyp `dest-os=ios` 的 flavor 机制自动设置）——与 nodejs-mobile 已验证配置一致。
 
-### 3. 其他补丁摘要（详见 apply_patches.py）
+### 3. 关键系统限制（真机实测）
+iOS 16.7 + Dopamine rootless（A14）的 JIT 内存行为与预期不同，逐项实测：
+- `mmap(PROT_EXEC)` 匿名内存：**拒绝**（执行时 SIGBUS）
+- `mmap(MAP_JIT)`：**失败**（MAP_FAILED，即使 CS_JIT 已授予）
+- `mmap(MAP_NORESERVE)`：**失败**（MAP_FAILED）← V8 代码区保留会用到，必须移除
+- 带 CS_JIT 的进程：普通 mmap(RW) + mprotect(RX) **可用**（执行成功）
+- 结论：ldid 签名 + JIT entitlements（CS_JIT 授予）+ 去 MAP_JIT/MAP_NORESERVE → 完整 JIT 可用
+
+### 4. 其他补丁摘要（详见 apply_patches.py）
 - c-ares：`HAVE_SYS_RANDOM_H` 关闭（macOS 独有头，改走 arc4random_buf）
 - v8.gyp：trap handler 源提升到 target 顶层（原嵌套在 maglev 块内，maglev 关闭时不求值，mksnapshot 会缺符号）
 - node.gypi：CoreFoundation/Security framework 链接对 ios 生效

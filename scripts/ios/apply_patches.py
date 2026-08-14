@@ -119,6 +119,18 @@ new_mapjit = """#if V8_OS_DARWIN
 edit("deps/v8/src/base/platform/platform-posix.cc", old_mapjit, new_mapjit,
      "platform-posix: 移除 MAP_JIT，走越狱机老式 JIT 路径")
 
+# 6b. MAP_NORESERVE 在本机 mmap 失败（实测 MAP_FAILED），会破坏代码区保留
+old_nr = """#if !V8_OS_AIX && !V8_OS_FREEBSD && !V8_OS_QNX
+    flags |= MAP_NORESERVE;
+#endif  // !V8_OS_AIX && !V8_OS_FREEBSD && !V8_OS_QNX"""
+new_nr = """#if !V8_OS_AIX && !V8_OS_FREEBSD && !V8_OS_QNX && !V8_OS_DARWIN
+    // iOS port: MAP_NORESERVE mmap FAILS on jailbroken iOS (MAP_FAILED),
+    // breaking V8's code range / sandbox reservation. Skip it.
+    flags |= MAP_NORESERVE;
+#endif  // !V8_OS_AIX && !V8_OS_FREEBSD && !V8_OS_QNX && !V8_OS_DARWIN"""
+edit("deps/v8/src/base/platform/platform-posix.cc", old_nr, new_nr,
+     "platform-posix: 移除 MAP_NORESERVE（本机 mmap 失败）")
+
 print("已应用:", len(applied))
 for a in applied:
     print("  +", a)
