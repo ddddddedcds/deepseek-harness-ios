@@ -14,6 +14,21 @@ NODE_VER=22.23.2
 NODE_SRC="$ROOT/node-v$NODE_VER"
 SHIM="$ROOT/ios-sdk-shim"
 
+echo "== [0/6] 缓存命中检测 =="
+if [ -f "$NODE_SRC/out/Release/node" ]; then
+  echo "构建产物已缓存，增量编译..."
+  cd "$NODE_SRC"
+  SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+  export CC="/usr/bin/clang -target arm64-apple-ios16.0 -isysroot $SDK -miphoneos-version-min=16.0 -I$SHIM"
+  export CXX="/usr/bin/clang++ -target arm64-apple-ios16.0 -isysroot $SDK -miphoneos-version-min=16.0 -stdlib=libc++ -std=gnu++20 -I$SHIM"
+  export CC_host=/usr/bin/clang
+  export CXX_host="/usr/bin/clang++ -std=gnu++20"
+  ninja -C out/Release node
+  echo "增量编译完成"
+else
+  echo "无缓存，走完整构建"
+fi
+
 echo "== [1/6] Node $NODE_VER 源码 =="
 if [ ! -d "$NODE_SRC" ]; then
   curl -sL -o /tmp/node-src.tar.gz "https://nodejs.org/dist/v$NODE_VER/node-v$NODE_VER.tar.gz"
