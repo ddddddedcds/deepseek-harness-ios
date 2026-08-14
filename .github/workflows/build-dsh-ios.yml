@@ -24,11 +24,11 @@ jobs:
       - name: 交叉编译 Node 22 for iOS + nodejs deb
         run: |
           chmod +x scripts/*.sh
-          ./scripts/build-node-ios.sh
+          ./scripts/ios/build-node-ios.sh
         timeout-minutes: 120
 
       - name: 打包 dsh-ios deb（node-pty addon + DSH 全量依赖）
-        run: ./scripts/build-dsh-ios.sh
+        run: ./scripts/ios/build-dsh-ios.sh
         timeout-minutes: 60
 
       - name: 上传 deb 产物
