@@ -21,7 +21,7 @@ if [ ! -d "$NODE_SRC" ]; then
 fi
 
 echo "== [2/6] 应用 iOS 补丁 =="
-python3 scripts/apply_patches.py "$NODE_SRC"
+python3 "$(dirname "$0")/apply_patches.py" "$NODE_SRC"
 
 echo "== [3/6] configure（darwin JIT 路径 + ninja）=="
 cd "$NODE_SRC"
@@ -70,8 +70,7 @@ make install DESTDIR=/tmp/node-ios-staging >/dev/null
 rm -rf /tmp/node-ios-staging/var/jb/usr/local/include /tmp/node-ios-staging/var/jb/usr/local/share/man
 mkdir -p /tmp/nodejs-deb/DEBIAN /tmp/nodejs-deb/var/jb/usr/local/lib/nodejs
 cp -a /tmp/node-ios-staging/var/jb/usr/local/. /tmp/nodejs-deb/var/jb/usr/local/
-cp "$SHIM/../dist/addons/node-jit-entitlements.plist" /tmp/nodejs-deb/var/jb/usr/local/lib/nodejs/entitlements.plist 2>/dev/null || \
-  cp "$ROOT/ios-sdk-shim/../dist/addons/node-jit-entitlements.plist" /tmp/nodejs-deb/var/jb/usr/local/lib/nodejs/entitlements.plist 2>/dev/null || true
+cp "$(dirname "$0")/node-jit-entitlements.plist" /tmp/nodejs-deb/var/jb/usr/local/lib/nodejs/entitlements.plist
 cat > /tmp/nodejs-deb/DEBIAN/control <<'CTRL'
 Package: nodejs
 Name: Node.js (iOS arm64)
