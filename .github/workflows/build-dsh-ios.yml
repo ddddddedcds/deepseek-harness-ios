@@ -23,7 +23,7 @@ jobs:
 
       - name: 交叉编译 Node 22 for iOS + nodejs deb
         run: |
-          chmod +x scripts/*.sh
+          chmod +x scripts/ios/*.sh
           ./scripts/ios/build-node-ios.sh
         timeout-minutes: 120
 
