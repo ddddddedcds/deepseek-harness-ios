@@ -38,6 +38,24 @@ fi
 echo "== [2/6] 应用 iOS 补丁 =="
 python3 "$(dirname "$0")/apply_patches.py" "$NODE_SRC"
 
+# ccache 加速（存在则启用）
+if command -v ccache >/dev/null 2>&1; then
+  export CCACHE_CPP2=1 CCACHE_SLOPPINESS=time_macros CCACHE_BASEDIR="$ROOT" CCACHE_DIR="${CCACHE_DIR:-$ROOT/.ccache}"
+  mkdir -p "$ROOT/ccache-bin"
+  SDK_FOR_CC=$(xcrun --sdk iphoneos --show-sdk-path)
+  cat > "$ROOT/ccache-bin/clang-ios" <<CCEOF
+#!/bin/sh
+exec ccache /usr/bin/clang -target arm64-apple-ios16.0 -isysroot "$SDK_FOR_CC" -miphoneos-version-min=16.0 -I$SHIM "\$@"
+CCEOF
+  cat > "$ROOT/ccache-bin/clang++-ios" <<CCEOF
+#!/bin/sh
+exec ccache /usr/bin/clang++ -target arm64-apple-ios16.0 -isysroot "$SDK_FOR_CC" -miphoneos-version-min=16.0 -stdlib=libc++ -std=gnu++20 -I$SHIM "\$@"
+CCEOF
+  chmod +x "$ROOT/ccache-bin/clang-ios" "$ROOT/ccache-bin/clang++-ios"
+  export CC="$ROOT/ccache-bin/clang-ios" CXX="$ROOT/ccache-bin/clang++-ios"
+  echo "ccache 已启用"
+fi
+
 echo "== [3/6] configure（darwin JIT 路径 + ninja）=="
 cd "$NODE_SRC"
 SDK=$(xcrun --sdk iphoneos --show-sdk-path)

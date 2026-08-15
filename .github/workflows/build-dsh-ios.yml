@@ -18,14 +18,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 安装 ninja
-        run: brew install ninja
+      - name: 安装 ninja + ccache
+        run: brew install ninja ccache
 
       - name: 缓存 Node 源码与构建产物
         id: cache-node
         uses: actions/cache@v4
         with:
-          path: node-v22.23.2
+          path: |
+            node-v22.23.2
+            .ccache
           key: node-ios-build-${{ runner.arch }}-${{ hashFiles('scripts/ios/apply_patches.py', 'scripts/ios/build-*.sh', 'ios-sdk-shim/**') }}
           restore-keys: |
             node-ios-build-${{ runner.arch }}-
