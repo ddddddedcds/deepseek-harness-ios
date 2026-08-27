@@ -1,7 +1,8 @@
 # dsh 移植到越狱 iOS（rootless / Dopamine）
 
 把 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`dsh`）移植到越狱 iOS 的完整工程：
-- **Node.js 22.23.2** 交叉编译为 iOS arm64（rootless `/var/jb` 布局），走 **darwin 式 JIT 路径**（完整 JIT + WASM）
+- **Node.js 22.23.2** 交叉编译为 iOS arm64（rootless `/var/jb` 布局）；**SSH/终端环境以 `--jitless` 运行**
+  （arm64e SSH 进程实测拿不到可执行内存页，见"运行时环境与通用性约束"），WebAssembly 相应不可用
 - **node-pty** 交叉编译真模块（真实 forkpty，终端功能完整）
 - **sharp / node-addon-require-builtin** 用 JS shim 替代（libvips 无法在 iOS 编译）
 - 标准 **.deb** 交付（`iphoneos-arm64`，dpkg 管理，postinst 自动 ldid 签名）
@@ -53,9 +54,47 @@ iOS 16.7 + Dopamine rootless（A14）的 JIT 内存行为与预期不同，逐�
   - **踩坑修复（0.1.1-rc.2 构建）**：`scripts/ios/build-dsh-ios.sh` 的 python 补丁曾多插一个无配 `#endif` 的 `#if`，预处理失衡 → `error: unterminated conditional directive`，连带把块内 `HANDLE_EINTR` 宏吞掉 → 后续 7 处 `HANDLE_EINTR` 报 `undeclared`。已修（`#if`/`#endif` 平衡，19/19）。同时把 node-gyp 失败从 `>/dev/null 2>&1 || true` 改为吐真实日志，避免下次盲猜。
 
 ## 真机验证记录（iPhone 12 Pro Max, A14, iOS 16.7, Dopamine rootless）
-- `--jitless` 可跑（但 undici 需 WASM → 不可用）
-- 移除 MAP_JIT 后完整 JIT 正常（与 imcynic Node 18 行为一致）
+- **（2026-08-27 SSH 实测）`--jitless` 是 SSH/终端进程的唯一可用模式**：`node -e` 执行 JS 即 SIGBUS
+  （crash `KERN_PROTECTION_FAILURE`：V8 code range 页 `rw-` 被当指令执行）。嵌入
+  `com.apple.security.cs.allow-jit` / `platform-application` 重签、root 用户均无效。
+  → 与构建期"完整 JIT 可用"的记录存在环境差异（构建期验证的进程上下文具备 JIT 内存权限）；如确需
+  完整 JIT + WASM，须在具备 JIT 权限的进程上下文（越狱 daemon / app 内）另行验证。
+- **（2026-08-27）undici wasm 崩溃已解决**：dsh 0.1.1 的 global fetch（node 内建 undici）其 HTTP parser
+  是 wasm 编译的，jitless 下加载即 `ReferenceError: WebAssembly is not defined`。解法 = 注入
+  `fetch-shim.cjs`（node:http 实现 fetch/Headers/Request/Response，支持 SSE `getReader` 与
+  `AbortSignal.timeout`）+ WebAssembly 全局 stub（永不 settle，令 undici 初始化不再 rejection）+
+  `--no-experimental-fetch --no-experimental-websocket`。**dsh 已可越过 undici 崩溃，走到插件加载。**
+- **（2026-08-27）Unicode 正则问题已修**：node 交叉编译默认 `--with-intl=none`（无 ICU），dsh 插件链
+  （llm-pi-ai / hono path-to-regexp / jose / dsh-tools 等）使用 `\p{L}`、`\p{N}`、`\p{ID_Start}` 等
+  Unicode 属性正则 200+ 处 → V8 报 `Invalid property name in character class`。已重编 node 为
+  `--with-intl=small-icu`（Unicode 数据齐全）。
 - iOS 16.7 libSystem 实测导出 `mach_vm_map/mach_vm_remap`（SDK 头缺失，shim 补齐）
+
+## 运行时环境与通用性约束（真机实测 2026-08-27）
+
+dsh-ios 附带的 nodejs 是**标准 Node.js 22.23.2**（arm64 iOS），任何**纯 JS** 程序都能运行；
+但 iOS 越狱环境的三道硬限制决定了边界：
+
+1. **JIT 不可用（必须 `--jitless`）**：SSH 会话进程（mobile/root 均实测）里 V8 拿不到可执行内存页。
+   → 所有工具以 `--jitless` 运行：纯 JS 解释执行（慢 3–10 倍，不影响正确性）。
+2. **WebAssembly 不可用**：`--jitless` 强制禁用 wasm（`--expose-wasm` 会被冲突禁用）。
+   → 依赖 wasm 的库/工具无法使用（如 wasm 打包的压缩/加密/sqlite 等）。
+3. **global fetch 需要 shim**：Node 内置 fetch（undici）的 llhttp parser 是 wasm，jitless 下加载即崩。
+   → 任何用 fetch 的工具都要挂 `fetch-shim.cjs`（见上文，已随 dsh-ios 部署到
+   `/var/jb/usr/local/lib/fetch-shim.cjs`）。
+
+其它注意：
+- **原生 addon（.node）**：npm 现成 prebuilt 多为 macOS/Linux，iOS 无法 dlopen，需交叉编译 arm64 iOS 版
+  （node-pty 已做）；纯 JS 包无此限制。
+- **nodejs deb 只含 node 二进制，不含 npm CLI**：装其他工具需从开发机拷 `node_modules` 或自行补 npm。
+- **Unicode 正则**：重编后带 ICU（small-icu），任意 `\p{...}` 属性正则可用。
+
+### 推荐启动姿势（其他工具）
+```sh
+NODE_OPTIONS="--jitless --no-experimental-fetch --no-experimental-websocket \
+  --require /var/jb/usr/local/lib/fetch-shim.cjs"
+/var/jb/usr/local/bin/node your-tool.js
+```
 
 ## Credits / 血缘
 
@@ -66,6 +105,6 @@ iOS 16.7 + Dopamine rootless（A14）的 JIT 内存行为与预期不同，逐�
 
 ## 当前发布状态
 
-- 最新 deb：`dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2，Node 22.23.2 不变）。
+- 最新 deb：`dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2）+ `nodejs_22.23.2-1_iphoneos-arm64.deb`（**重编带 ICU / small-icu**，Unicode 正则可用）。安装顺序：nodejs → dsh-ios。
 - 分支 `ios-port` 已推送到 fork [`ddddddedcds/deepseek-harness`](https://github.com/ddddddedcds/deepseek-harness)；`master` 已 fast-forward 到上游 0.1.1-rc.2（`b150a551`）。
-- 已知限制（待真机验证）：sharp/libvips 图片附件不可用；node-pty addon 尚未在越狱机实跑确认。
+- 已知限制：SSH/终端环境须 `--jitless`（fetch 走 shim）；sharp/libvips 图片附件不可用；node-pty addon 真机验证待做；WebSocket 客户端不可用（已禁用）。

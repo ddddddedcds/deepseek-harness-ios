@@ -43,7 +43,7 @@ A community port of `dsh` runs on jailbroken iOS (arm64, rootless jailbreaks suc
 - Build & packaging guide: [docs/ios-port.md](docs/ios-port.md)
 - Current package: `dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`
 
-Known limitations: `sharp`/`libvips` are shimmed (no image processing); `node-pty` is built but pending on-device verification.
+Known limitations: `sharp`/`libvips` are shimmed (no image processing); `node-pty` is built but pending on-device verification; on a device (SSH/terminal context) the runtime must run `--jitless` (V8 cannot obtain executable memory), which disables WebAssembly — the bundled `fetch-shim.cjs` (node:http based) restores `fetch`, and the runtime ships with ICU so Unicode property regexes work. See [docs/ios-port.md](docs/ios-port.md) for the full runtime constraints.
 
 ## Community and support
 
