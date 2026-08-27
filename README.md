@@ -36,6 +36,15 @@ pnpm dsh web
 
 `pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
 
+## iOS (jailbroken)
+
+A community port of `dsh` runs on jailbroken iOS (arm64, rootless jailbreaks such as Dopamine). It bundles a cross-compiled Node.js 22 runtime, a native `node-pty` addon, and JS shims for `sharp`/`require-builtin`, packaged as a `.deb`.
+
+- Build & packaging guide: [docs/ios-port.md](docs/ios-port.md)
+- Current package: `dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`
+
+Known limitations: `sharp`/`libvips` are shimmed (no image processing); `node-pty` is built but pending on-device verification.
+
 ## Community and support
 
 - Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
