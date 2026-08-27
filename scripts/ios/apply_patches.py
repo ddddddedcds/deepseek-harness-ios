@@ -3,6 +3,12 @@
 
 Usage: python3 apply_patches.py <node-source-dir>
 Idempotent: safe to re-run.
+
+References (technique lineage, not code copy):
+  - davghz/node22-ios-source  -- Node 22 iOS cross-compile patchset (darwin JIT path)
+  - j0shua-SYSON/node-ios    -- iOS Node build + native module (node-pty) adaptation
+  - imcynic (Node 18 iOS)     -- darwin-style JIT memory path (drop MAP_JIT, direct PROT_EXEC)
+The 7 patches below are written independently, building on that community lineage.
 """
 import sys
 import os

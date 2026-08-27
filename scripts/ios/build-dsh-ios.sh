@@ -6,7 +6,7 @@
 #   * package dsh-ios .deb (self-contained, no device-side npm)
 #
 # Usage: ./scripts/build-dsh-ios.sh   (requires nodejs deb built first: scripts/build-node-ios.sh)
-# Output: dist/dsh-ios_0.1.0-rc.6-1_iphoneos-arm64.deb
+# Output: dist/dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb
 set -e
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -127,7 +127,7 @@ chmod 755 "$DEB/var/jb/usr/local/bin/dsh-ios"
 cat > "$DEB/DEBIAN/control" <<'CTRL'
 Package: dsh-ios
 Name: DeepSeek Harness for iOS
-Version: 0.1.0-rc.6-1
+Version: 0.1.1-rc.2-1
 Architecture: iphoneos-arm64
 Maintainer: dsh-ios port
 Section: Development
@@ -150,5 +150,5 @@ fi
 exit 0
 CTRL
 chmod 755 "$DEB/DEBIAN/postinst"
-dpkg-deb -b --root-owner-group -Zgzip "$DEB" "$ROOT/dist/dsh-ios_0.1.0-rc.6-1_iphoneos-arm64.deb" >/dev/null
-echo "✅ $ROOT/dist/dsh-ios_0.1.0-rc.6-1_iphoneos-arm64.deb"
+dpkg-deb -b --root-owner-group -Zgzip "$DEB" "$ROOT/dist/dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb" >/dev/null
+echo "✅ $ROOT/dist/dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb"

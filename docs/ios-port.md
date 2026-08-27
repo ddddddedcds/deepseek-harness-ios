@@ -19,7 +19,7 @@
 ## 安装（设备端，root）
 
 ```sh
-dpkg -i nodejs_22.23.2-1_iphoneos-arm64.deb dsh-ios_0.1.0-rc.6-1_iphoneos-arm64.deb
+dpkg -i nodejs_22.23.2-1_iphoneos-arm64.deb dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb
 dsh-ios    # Safari 打开 http://127.0.0.1:3080
 ```
 

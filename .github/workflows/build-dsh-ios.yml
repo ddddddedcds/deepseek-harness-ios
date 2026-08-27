@@ -48,7 +48,7 @@ jobs:
           name: dsh-ios-debs
           path: |
             dist/nodejs_22.23.2-1_iphoneos-arm64.deb
-            dist/dsh-ios_0.1.0-rc.6-1_iphoneos-arm64.deb
+            dist/dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb
           if-no-files-found: error
 
       - name: 发布到 Release（仅 tag 触发时）
@@ -57,5 +57,5 @@ jobs:
         with:
           files: |
             dist/nodejs_22.23.2-1_iphoneos-arm64.deb
-            dist/dsh-ios_0.1.0-rc.6-1_iphoneos-arm64.deb
+            dist/dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb
           generate_release_notes: true
