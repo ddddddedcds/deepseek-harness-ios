@@ -49,8 +49,23 @@ iOS 16.7 + Dopamine rootless（A14）的 JIT 内存行为与预期不同，逐�
 - node.gypi：CoreFoundation/Security framework 链接对 ios 生效
 - crypto_context.cc：macOS 专属 SecTrustSettings 代码对 iOS 排除
 - ninja 生成器：configure 后需去掉 host 变体与 target 冲突的 gen 输出规则（脚本内置）
+- node-pty `src/unix/pty.cc`：`libproc.h` 与 `pthread_chdir_np`/`pthread_fchdir_np` externs 是 macOS 专有，用 `#if defined(__APPLE__) && !defined(__aarch64__)` guard；`HANDLE_EINTR` 宏**必须留在 guard 外**（iOS 的 kqueue 等待块仍要用它）。
+  - **踩坑修复（0.1.1-rc.2 构建）**：`scripts/ios/build-dsh-ios.sh` 的 python 补丁曾多插一个无配 `#endif` 的 `#if`，预处理失衡 → `error: unterminated conditional directive`，连带把块内 `HANDLE_EINTR` 宏吞掉 → 后续 7 处 `HANDLE_EINTR` 报 `undeclared`。已修（`#if`/`#endif` 平衡，19/19）。同时把 node-gyp 失败从 `>/dev/null 2>&1 || true` 改为吐真实日志，避免下次盲猜。
 
 ## 真机验证记录（iPhone 12 Pro Max, A14, iOS 16.7, Dopamine rootless）
 - `--jitless` 可跑（但 undici 需 WASM → 不可用）
 - 移除 MAP_JIT 后完整 JIT 正常（与 imcynic Node 18 行为一致）
 - iOS 16.7 libSystem 实测导出 `mach_vm_map/mach_vm_remap`（SDK 头缺失，shim 补齐）
+
+## Credits / 血缘
+
+本 iOS 移植的思路与 recipe 借鉴自以下公开工作（**血缘/思路来源，非代码直接拷贝**）：
+- [davghz/node22-ios-source](https://github.com/davghz/node22-ios-source) — Node 22 iOS 交叉编译 recipe
+- [j0shua-SYSON/node-ios](https://github.com/j0shua-SYSON/node-ios) — Node iOS 移植参考
+- imcynic — V8/iOS 无 MAP_JIT 路径实测（Node 18 行为对齐）
+
+## 当前发布状态
+
+- 最新 deb：`dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2，Node 22.23.2 不变）。
+- 分支 `ios-port` 已推送到 fork [`ddddddedcds/deepseek-harness`](https://github.com/ddddddedcds/deepseek-harness)；`master` 已 fast-forward 到上游 0.1.1-rc.2（`b150a551`）。
+- 已知限制（待真机验证）：sharp/libvips 图片附件不可用；node-pty addon 尚未在越狱机实跑确认。
