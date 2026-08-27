@@ -89,6 +89,35 @@ dsh-ios 附带的 nodejs 是**标准 Node.js 22.23.2**（arm64 iOS），任何**
 - **nodejs deb 只含 node 二进制，不含 npm CLI**：装其他工具需从开发机拷 `node_modules` 或自行补 npm。
 - **Unicode 正则**：重编后带 ICU（small-icu），任意 `\p{...}` 属性正则可用。
 
+## iOS 插件 stub（koffi / sandbox / subprocess）
+
+dsh 0.1.1 的 `dsh-sandbox-local` / `dsh-subprocess-local` 依赖 **koffi**（FFI 原生 addon，
+无 iOS prebuilt），sandbox 还依赖 Linux landlock 与 Windows ACL——**iOS 上这些能力本就不存在**
+（toolpkg manifest 的 `disabled_features` 早已标注 "koffi - no ios prebuilt"）。但插件的硬
+`import koffi` 会直接挡死 dsh web 启动。
+
+**解法（已实测，dsh web 3080 返回 HTTP 200）**：把两个插件的 `lib/index.js` 替换为
+**extends 基类的惰性 stub**（基类 `SandboxProvider` / `SubprocessRuntime` 是纯 JS，服务注册
+`ctx.sandbox` / `ctx.subprocess` 仍生效，`dsh-bash-sandbox` / `dsh-permission-presets` 可正常
+激活）：
+
+```js
+// dsh-sandbox-local/lib/index.js
+import { SandboxProvider } from "@deepseek-ai/dsh-sandbox";
+export default class LocalSandboxProvider extends SandboxProvider {
+  async start() {}
+}
+// dsh-subprocess-local/lib/index.js
+import { SubprocessRuntime } from "@deepseek-ai/dsh-subprocess";
+export default class LocalSubprocessRuntime extends SubprocessRuntime {
+  async start() {}
+}
+```
+
+代价：沙箱隔离与 FFI 子进程在 iOS 上不可用（Node 内置 `child_process`/`fork` 仍可用）；
+聊天气泡、Web UI、文件、会话等核心功能不受影响。若后续需要真 koffi，可交叉编译
+（node-gyp，纯 C，15–30 分钟量级）。
+
 ### 推荐启动姿势（其他工具）
 ```sh
 NODE_OPTIONS="--jitless --no-experimental-fetch --no-experimental-websocket \
@@ -105,6 +134,7 @@ NODE_OPTIONS="--jitless --no-experimental-fetch --no-experimental-websocket \
 
 ## 当前发布状态
 
-- 最新 deb：`dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2）+ `nodejs_22.23.2-1_iphoneos-arm64.deb`（**重编带 ICU / small-icu**，Unicode 正则可用）。安装顺序：nodejs → dsh-ios。
+- 最新 deb：`dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2）+ `nodejs_22.23.2-2_iphoneos-arm64.deb`（**重编：V8 完整 JIT（mprotect W^X 补丁）+ WASM + small-icu**，实测 `JIT_OK` / `WASM_OK 42` / `ICU_OK 78.2`）。安装顺序：nodejs → dsh-ios。
+- **dsh web 已在设备跑通**：`dsh-ios` 启动后 `http://127.0.0.1:3080` 返回 HTTP 200（launcher 需带 `--predictable --single-threaded --wasm-enforce-bounds-checks --wasm-max-mem-pages=16384 --expose-internals`，防 W^X race；配合上文 koffi 插件 stub）。launcher 另挂 `--patch /var/mobile/.dsh/ios-overrides.patch.yml`（留作插件禁用 overlay）。
 - 分支 `ios-port` 已推送到 fork [`ddddddedcds/deepseek-harness`](https://github.com/ddddddedcds/deepseek-harness)；`master` 已 fast-forward 到上游 0.1.1-rc.2（`b150a551`）。
-- 已知限制：SSH/终端环境须 `--jitless`（fetch 走 shim）；sharp/libvips 图片附件不可用；node-pty addon 真机验证待做；WebSocket 客户端不可用（已禁用）。
+- 已知限制：沙箱/FFI 子进程不可用（koffi stub，见上）；sharp/libvips 图片附件不可用；node-pty addon 真机验证待做；WebSocket 客户端不可用（`--no-experimental-websocket` 已禁，undici 正常时或可放开）。
