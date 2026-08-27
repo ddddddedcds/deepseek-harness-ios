@@ -169,7 +169,7 @@ NODE_OPTIONS="--predictable --single-threaded \
 - [davghz/node22-ios-source](https://github.com/davghz/node22-ios-source) — Node 22 iOS 交叉编译 recipe
 - [j0shua-SYSON/node-ios](https://github.com/j0shua-SYSON/node-ios) — Node iOS 移植参考
 - [j0shua-SYSON/openclaw-ios](https://github.com/j0shua-SYSON/openclaw-ios) — **V8 W^X 补丁来源**（A9 验证，本工程适配 A14/arm64e）
-- imcynic — V8/iOS 无 MAP_JIT 路径实测（Node 18 行为对齐）
+- [imcynic/nodejs-ios](https://github.com/imcynic/nodejs-ios) — V8/iOS 无 MAP_JIT 路径实测（Node 18 行为对齐；该仓库无独立 LICENSE，仅思路参考）
 
 ## 当前发布状态
 
