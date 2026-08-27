@@ -45,6 +45,16 @@ A community port of `dsh` runs on jailbroken iOS (arm64, rootless jailbreaks suc
 
 Known limitations: `sharp`/`libvips` are shimmed (no image processing); `node-pty` is built but pending on-device verification; on a device the runtime uses a patched V8 full JIT via `mprotect` W^X (works on A14/arm64e; run with `--predictable --single-threaded`), the bundled Node ships small-icu so Unicode property regexes work; WebAssembly is stubbed via the bundled `fetch-shim.cjs` (undici's wasm llhttp fatals on A14; `fetch` is re-routed through `node:http`); the `dsh-sandbox-local`/`dsh-subprocess-local` plugins are inert stubs (their koffi FFI addon has no iOS prebuilt), which is required for `dsh web` to boot — it serves `http://127.0.0.1:3080` on-device. See [docs/ios-port.md](docs/ios-port.md) for full runtime constraints.
 
+### iOS port credits
+
+The iOS port builds on the following public work (idea/recipe lineage, not copied code; full detail in [docs/ios-port.md](docs/ios-port.md)):
+
+- [dddddedcds/Node.js-for-ios](https://github.com/ddddddedcds/Node.js-for-ios) — cross-compile recipe, V8 W^X patch, fetch shim, launcher (standalone repo).
+- [j0shua-SYSON/openclaw-ios](https://github.com/j0shua-SYSON/openclaw-ios) — V8 W^X JIT patch source (MIT).
+- [j0shua-SYSON/node-ios](https://github.com/j0shua-SYSON/node-ios) — Node-iOS build approach & entitlements (MIT).
+- [davghz/node22-ios-source](https://github.com/davghz/node22-ios-source) — Node 22 iOS cross-compile recipe.
+- [imcynic/nodejs-ios](https://github.com/imcynic/nodejs-ios) — no-MAP_JIT path evidence (no independent LICENSE; idea reference only).
+
 ## Community and support
 
 - Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
