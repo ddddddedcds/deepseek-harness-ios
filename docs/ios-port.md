@@ -23,7 +23,7 @@
 ## 安装（设备端，root）
 
 ```sh
-dpkg -i nodejs_22.23.2-3_iphoneos-arm64.deb dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb
+dpkg -i nodejs_22.23.2-3_iphoneos-arm64.deb dsh-ios_0.1.1-rc.2-2_iphoneos-arm64.deb
 dsh-ios    # 浏览器打开 http://127.0.0.1:3080
 ```
 
@@ -143,8 +143,7 @@ export default class LocalSubprocessRuntime extends SubprocessRuntime {
 聊天气泡、Web UI、文件、会话等核心功能不受影响。若后续需要真 koffi，可交叉编译
 （node-gyp，纯 C，15–30 分钟量级）。
 
-> ⚠️ stub 改动目前只在设备文件上；重打包 dsh-ios deb 时需把 stub 固化进去（或 postinst 打补丁），
-> 否则重装设备会回到 koffi 硬挡。
+> ✅ **stub 已固化进 deb**：`dsh-ios_0.1.1-rc.2-2_iphoneos-arm64.deb`（2026-08-27）已内嵌两个插件 stub（`dsh-sandbox-local`/`dsh-subprocess-local` 的 `lib/index.js`），重装设备不会回到 koffi 硬挡。
 
 ### 推荐启动姿势（dsh）
 ```sh
@@ -173,12 +172,10 @@ NODE_OPTIONS="--predictable --single-threaded \
 
 ## 当前发布状态
 
-- 最新 deb：`dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2）
-  + `nodejs_22.23.2-3_iphoneos-arm64.deb`（V8 W^X 全 JIT + small-icu + 无 DSHLOG 日志噪音，
-  实测 `JIT_OK` / `ICU 78.2`）。安装顺序：nodejs → dsh-ios。**deb 产物不进 git（dist/ 已 gitignore）。**
+- 最新 deb：`dsh-ios_0.1.1-rc.2-2_iphoneos-arm64.deb`（基于 `@deepseek-ai/dsh` 0.1.1-rc.2，**内含 koffi 插件 stub**）+ `nodejs_22.23.2-3_iphoneos-arm64.deb`（V8 W^X 全 JIT + small-icu，无 DSHLOG 日志噪音，实测 `JIT_OK` / `ICU 78.2`）。安装顺序：nodejs → dsh-ios。**deb 产物不进 git（dist/ 已 gitignore）。**
 - **dsh web 已设备跑通**：`dsh-ios` 启动后 `http://127.0.0.1:3080` HTTP 200，LLM 直连 200。
 - 分支 `ios-port` 已推送到 fork [`ddddddedcds/deepseek-harness-ios`](https://github.com/ddddddedcds/deepseek-harness-ios)
   （原 `deepseek-harness`，已改名）；`master` 已 fast-forward 到上游 0.1.1-rc.2（`b150a551`）。
 - 已知限制：WebAssembly 不可用（stub，见上）；沙箱/FFI 子进程不可用（koffi stub，见上）；
   sharp/libvips 图片附件不可用（shim）；worker_threads 不可用（--single-threaded）；
-  iOS 16.7 Safari 需 `AbortSignal.any` polyfill（已注入前端 index.html）。
+  iOS 16.7 Safari 需 `AbortSignal.any` polyfill（已注入前端 index.html，完整实现含 reason 传播）。
