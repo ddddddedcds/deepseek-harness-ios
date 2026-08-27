@@ -43,7 +43,7 @@ A community port of `dsh` runs on jailbroken iOS (arm64, rootless jailbreaks suc
 - Build & packaging guide: [docs/ios-port.md](docs/ios-port.md)
 - Current package: `dsh-ios_0.1.1-rc.2-1_iphoneos-arm64.deb`
 
-Known limitations: `sharp`/`libvips` are shimmed (no image processing); `node-pty` is built but pending on-device verification; on a device the runtime uses a patched V8 full JIT via `mprotect` W^X (works on A14/arm64e; run with `--predictable --single-threaded`), the bundled Node ships small-icu so Unicode property regexes work; the `dsh-sandbox-local`/`dsh-subprocess-local` plugins are inert stubs (their koffi FFI addon has no iOS prebuilt), which is required for `dsh web` to boot — it serves `http://127.0.0.1:3080` on-device. See [docs/ios-port.md](docs/ios-port.md) for full runtime constraints.
+Known limitations: `sharp`/`libvips` are shimmed (no image processing); `node-pty` is built but pending on-device verification; on a device the runtime uses a patched V8 full JIT via `mprotect` W^X (works on A14/arm64e; run with `--predictable --single-threaded`), the bundled Node ships small-icu so Unicode property regexes work; WebAssembly is stubbed via the bundled `fetch-shim.cjs` (undici's wasm llhttp fatals on A14; `fetch` is re-routed through `node:http`); the `dsh-sandbox-local`/`dsh-subprocess-local` plugins are inert stubs (their koffi FFI addon has no iOS prebuilt), which is required for `dsh web` to boot — it serves `http://127.0.0.1:3080` on-device. See [docs/ios-port.md](docs/ios-port.md) for full runtime constraints.
 
 ## Community and support
 
