@@ -59,12 +59,56 @@ python3 - <<'PY'
 import re
 f = "src/unix/pty.cc"
 s = open(f).read()
-s = s.replace('#if defined(__APPLE__) && !defined(__aarch64__)\n#include <libproc.h>',
-              '#if defined(__APPLE__) && !defined(__aarch64__)\n#include <libproc.h>')  # no-op guard
+# libproc.h is macOS-only; guard the include (balanced #if/#endif).
 s = s.replace('#elif defined(__APPLE__)\n#include <libproc.h>',
               '#elif defined(__APPLE__)\n#if !defined(__aarch64__)\n#include <libproc.h>\n#endif')
-s = s.replace('#if defined(__APPLE__)\nextern "C" {',
-              '#if defined(__APPLE__)\n#if !defined(__aarch64__)\nextern "C" {')
+# extern "C" pthread externs are macOS-only APIs; guard them, but keep
+# HANDLE_EINTR defined unconditionally -- the kqueue wait block below still
+# uses it on iOS. (Previous version nested an extra #if without a matching
+# #endif, which unbalanced the preprocessor and hid HANDLE_EINTR.)
+old_block = '''#if defined(__APPLE__)
+extern "C" {
+// Changes the current thread's directory to a path or directory file
+// descriptor. libpthread only exposes a syscall wrapper starting in
+// macOS 10.12, but the system call dates back to macOS 10.5. On older OSes,
+// the syscall is issued directly.
+int pthread_chdir_np(const char* dir) API_AVAILABLE(macosx(10.12));
+int pthread_fchdir_np(int fd) API_AVAILABLE(macosx(10.12));
+}
+
+#define HANDLE_EINTR(x) ({ \\
+  int eintr_wrapper_counter = 0; \\
+  decltype(x) eintr_wrapper_result; \\
+  do { \\
+    eintr_wrapper_result = (x); \\
+  } while (eintr_wrapper_result == -1 && errno == EINTR && \\
+           eintr_wrapper_counter++ < 100); \\
+  eintr_wrapper_result; \\
+})
+#endif'''
+new_block = '''#if defined(__APPLE__) && !defined(__aarch64__)
+extern "C" {
+// Changes the current thread's directory to a path or directory file
+// descriptor. libpthread only exposes a syscall wrapper starting in
+// macOS 10.12, but the system call dates back to macOS 10.5. On older OSes,
+// the syscall is issued directly.
+int pthread_chdir_np(const char* dir) API_AVAILABLE(macosx(10.12));
+int pthread_fchdir_np(int fd) API_AVAILABLE(macosx(10.12));
+}
+#endif
+
+#define HANDLE_EINTR(x) ({ \\
+  int eintr_wrapper_counter = 0; \\
+  decltype(x) eintr_wrapper_result; \\
+  do { \\
+    eintr_wrapper_result = (x); \\
+  } while (eintr_wrapper_result == -1 && errno == EINTR && \\
+           eintr_wrapper_counter++ < 100); \\
+  eintr_wrapper_result; \\
+})'''
+assert old_block in s, "pty.cc extern/HANDLE_EINTR block not found -- patch text mismatch"
+s = s.replace(old_block, new_block)
+# pty_getproc depends on libproc; guard its declaration + uses on iOS.
 s = s.replace('#if defined(__APPLE__)\nstatic char *\npty_getproc(int);',
               '#if defined(__APPLE__) && !defined(__aarch64__)\nstatic char *\npty_getproc(int);')
 s = s.replace('#if defined(__APPLE__)\n  if (info.Length() != 1 ||',
@@ -75,8 +119,9 @@ open(f, "w").write(s)
 print("pty.cc patched")
 PY
 export CC=/tmp/clang-ios CXX=/tmp/clang++-ios CFLAGS="-DNAPI_VERSION=8" CXXFLAGS="-DNAPI_VERSION=8"
-npx --yes node-gyp@10 rebuild --nodedir="$WORK/node-headers" --arch=arm64 >/dev/null 2>&1 || true
-ls build/Release/pty.node build/Release/spawn-helper >/dev/null 2>&1 || { echo "node-pty 编译失败"; exit 1; }
+npx --yes node-gyp@10 rebuild --nodedir="$WORK/node-headers" --arch=arm64 >"$WORK/node-pty-build.log" 2>&1 || {
+  echo "node-pty 编译失败，详见 $WORK/node-pty-build.log:"; tail -40 "$WORK/node-pty-build.log"; exit 1; }
+ls build/Release/pty.node build/Release/spawn-helper >/dev/null 2>&1 || { echo "node-pty 产物缺失"; exit 1; }
 
 echo "== [3/5] npm 安装 @deepseek-ai/dsh（跳过原生构建）=="
 mkdir -p "$WORK/dsh" && cd "$WORK/dsh"
