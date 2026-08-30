@@ -166,7 +166,9 @@ cat > "$DEB/var/jb/usr/local/bin/dsh-ios" <<'EOF'
 #!/bin/sh
 export DSH_HOME="${DSH_HOME:-/var/mobile/.dsh}"
 export PATH="/var/jb/usr/local/bin:$PATH"
-exec /var/jb/usr/local/bin/node --expose-internals /var/jb/usr/local/bin/dsh web "$@"
+# --predictable --single-threaded: required on iOS. Without them the V8 W^X
+# page-flip races with JIT and crashes with SIGBUS (see docs/ios-port.md).
+exec /var/jb/usr/local/bin/node --expose-internals --predictable --single-threaded /var/jb/usr/local/bin/dsh web "$@"
 EOF
 chmod 755 "$DEB/var/jb/usr/local/bin/dsh-ios"
 cat > "$DEB/DEBIAN/control" <<'CTRL'
@@ -184,13 +186,32 @@ cat > "$DEB/DEBIAN/postinst" <<'CTRL'
 P=/var/jb/usr/local
 ENT="$P/lib/nodejs/entitlements.plist"
 REL="$P/lib/node_modules/node-pty/build/Release"
+LOG=/var/mobile/.dsh/postinst.log
+mkdir -p "$(dirname "$LOG")" 2>/dev/null
+log(){ echo "[dsh-ios postinst $(date +%H:%M:%S)] $*" >> "$LOG" 2>/dev/null; }
 if command -v ldid >/dev/null 2>&1; then
   [ -f "$ENT" ] || ENT=""
   for f in "$REL/pty.node" "$REL/spawn-helper"; do
     [ -f "$f" ] || continue
-    if [ -n "$ENT" ]; then ldid -S"$ENT" "$f" 2>/dev/null || ldid -S "$f" 2>/dev/null; else ldid -S "$f" 2>/dev/null; fi
+    if [ -n "$ENT" ]; then
+      ldid -S"$ENT" "$f" >>"$LOG" 2>&1 && log "signed $f OK" || { echo "ERROR: ldid -S $f FAILED" >&2; log "ERROR: ldid -S $f FAILED"; }
+    else
+      ldid -S "$f" >>"$LOG" 2>&1 && log "signed $f OK (no entitlements)" || { echo "ERROR: ldid -S $f FAILED" >&2; log "ERROR: ldid -S $f FAILED"; }
+    fi
   done
   chmod 755 "$REL/spawn-helper" 2>/dev/null
+else
+  echo "ERROR: ldid not found - node-pty addons left UNSIGNED" >&2
+  log "ERROR: ldid not found"
+fi
+# trustcache: AMFI needs the addons registered or they SIGKILL on load.
+if command -v jbctl >/dev/null 2>&1; then
+  for f in "$REL/pty.node" "$REL/spawn-helper"; do
+    [ -f "$f" ] || continue
+    jbctl trustcache add "$f" >>"$LOG" 2>&1 && log "trustcache add $f OK" || log "WARN: jbctl trustcache add $f failed"
+  done
+else
+  log "WARN: jbctl not found - trustcache registration skipped"
 fi
 exit 0
 CTRL

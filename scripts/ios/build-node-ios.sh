@@ -116,10 +116,28 @@ CTRL
 cat > /tmp/nodejs-deb/DEBIAN/postinst <<'CTRL'
 #!/bin/sh
 P=/var/jb/usr/local
+LOG=/var/mobile/.dsh/postinst.log
+mkdir -p "$(dirname "$LOG")" 2>/dev/null
+log(){ echo "[nodejs postinst $(date +%H:%M:%S)] $*" >> "$LOG" 2>/dev/null; }
 if command -v ldid >/dev/null 2>&1; then
-  ldid -S"$P/lib/nodejs/entitlements.plist" "$P/bin/node" 2>/dev/null && echo "node signed (JIT entitlements)" || echo "WARN: node signing failed"
+  if ldid -S"$P/lib/nodejs/entitlements.plist" "$P/bin/node" >>"$LOG" 2>&1; then
+    echo "node signed (JIT entitlements)"
+    log "node signed OK"
+  else
+    echo "ERROR: node signing FAILED - binary left UNSIGNED, will SIGKILL on V8 JIT" >&2
+    log "ERROR: ldid -S node FAILED (see above)"
+  fi
 else
-  echo "WARN: ldid not found"
+  echo "ERROR: ldid not found - node left UNSIGNED, will SIGKILL on V8 JIT" >&2
+  log "ERROR: ldid not found in PATH"
+fi
+# Register in trustcache so AMFI honors dynamic-codesigning entitlement.
+# ldid alone is NOT enough on Dopamine/rootless: a binary not in trustcache
+# gets AMFI-killed on mprotect(RX) the moment V8 JIT flips a page.
+if command -v jbctl >/dev/null 2>&1; then
+  jbctl trustcache add "$P/bin/node" >>"$LOG" 2>&1 && log "trustcache add node OK" || log "WARN: jbctl trustcache add node failed"
+else
+  log "WARN: jbctl not found - trustcache registration skipped (SIGKILL risk remains)"
 fi
 exit 0
 CTRL
